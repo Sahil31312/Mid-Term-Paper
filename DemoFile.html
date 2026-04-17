@@ -1,0 +1,2032 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>BioKG-Alt — Alternative Biomedical Knowledge Graph Demo</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+    <style>
+      @import url("https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500&display=swap");
+
+      :root {
+        --bg: #0c0f14;
+        --bg2: #131720;
+        --bg3: #1a1f2e;
+        --bg4: #222940;
+        --text: #e8eaf0;
+        --text2: #9ca3b8;
+        --text3: #6b7394;
+        --border: rgba(255, 255, 255, 0.06);
+        --accent: #4f8cff;
+        --accent2: #2563eb;
+        --glow: rgba(79, 140, 255, 0.15);
+        --disease: #1d9e75;
+        --gene: #7f77dd;
+        --drug: #ef9f27;
+        --pathway: #378add;
+        --phenotype: #d4537e;
+        --variant: #639922;
+        --tissue: #d85a30;
+        --sideeffect: #888780;
+        --font: "DM Sans", -apple-system, BlinkMacSystemFont, sans-serif;
+        --mono: "JetBrains Mono", monospace;
+        --radius: 12px;
+        --radius-sm: 8px;
+      }
+
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      html {
+        scroll-behavior: smooth;
+      }
+      body {
+        background: rgb(222, 216, 216);
+        color: black;
+        font-family: var(--font);
+        line-height: 1.6;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      /* ─── HEADER ─── */
+      .hero {
+        text-align: center;
+        padding: 56px 24px 40px;
+        background: linear-gradient(180deg, #0c54ef 0%, var(--bg) 100%);
+        position: relative;
+        overflow: hidden;
+      }
+      .hero::before {
+        content: "";
+        position: absolute;
+        top: -120px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 600px;
+        height: 600px;
+        background: radial-gradient(
+          circle,
+          rgba(79, 140, 255, 0.08) 0%,
+          transparent 70%
+        );
+        pointer-events: none;
+      }
+      .hero-badge {
+        display: inline-block;
+        padding: 5px 16px;
+        border: 1px solid rgba(79, 140, 255, 0.25);
+        border-radius: 20px;
+        font-size: 12px;
+        color: var(--accent);
+        letter-spacing: 0.5px;
+        margin-bottom: 16px;
+        background: rgba(79, 140, 255, 0.06);
+      }
+      .hero h1 {
+        font-size: 42px;
+        font-weight: 700;
+        letter-spacing: -1.2px;
+        background: linear-gradient(135deg, #fff 30%, var(--accent) 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        margin-bottom: 8px;
+      }
+      .hero p {
+        font-size: 16px;
+        color: var(--text2);
+        max-width: 640px;
+        margin: 0 auto;
+      }
+      .hero-meta {
+        display: flex;
+        justify-content: center;
+        gap: 24px;
+        margin-top: 20px;
+        font-size: 13px;
+        color: var(--text3);
+      }
+      .hero-meta span {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+
+      /* ─── NAV ─── */
+      .nav {
+        position: sticky;
+        top: 0;
+        z-index: 100;
+        background: rgba(18, 45, 252, 0.85);
+        backdrop-filter: blur(16px);
+        border-bottom: 1px solid var(--border);
+        padding: 0 24px;
+        display: flex;
+        justify-content: center;
+        gap: 4px;
+      }
+      .nav a {
+        color: white;
+        text-decoration: none;
+        font-size: 13px;
+        font-weight: 500;
+        padding: 12px 16px;
+        transition: color 0.2s;
+        white-space: nowrap;
+      }
+      .nav a:hover,
+      .nav a.active {
+        color: var(--accent);
+      }
+
+      /* ─── CONTAINER ─── */
+      .container {
+        max-width: 1100px;
+        margin: 0 auto;
+        padding: 0 24px;
+      }
+      .section {
+        padding: 48px 0;
+      }
+      .section-head {
+        font-size: 22px;
+        font-weight: 600;
+        margin-bottom: 6px;
+        letter-spacing: -0.5px;
+      }
+      .section-sub {
+        color: green;
+        font-size: 14px;
+        margin-bottom: 28px;
+      }
+
+      /* ─── STAT CARDS ─── */
+      .stats {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 14px;
+        margin-bottom: 36px;
+      }
+      .stat {
+        background: gray;
+        color: white;
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 20px;
+        text-align: center;
+        transition:
+          border-color 0.2s,
+          transform 0.2s;
+      }
+      .stat:hover {
+        border-color: rgba(79, 140, 255, 0.2);
+        transform: translateY(-2px);
+      }
+      .stat-num {
+        font-size: 28px;
+        font-weight: 700;
+        color: white;
+        letter-spacing: -1px;
+      }
+      .stat-label {
+        font-size: 12px;
+        color: white;
+        margin-top: 4px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+
+      /* ─── GRAPH CARD ─── */
+      .graph-card {
+        background: black;
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        overflow: hidden;
+      }
+      .graph-toolbar {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 12px 16px;
+        border-bottom: 1px solid var(--border);
+        flex-wrap: wrap;
+        background-color: rgb(58, 49, 49);
+      }
+      .graph-toolbar .btn {
+        padding: 6px 14px;
+        font-size: 12px;
+        font-weight: 500;
+        border: 1px solid var(--border);
+        border-radius: 20px;
+        background: transparent;
+        color: var(--text2);
+        cursor: pointer;
+        transition: all 0.2s;
+        font-family: var(--font);
+      }
+      .graph-toolbar .btn:hover {
+        border-color: var(--accent);
+        color: var(--accent);
+      }
+      .graph-toolbar .btn.active {
+        background: var(--accent);
+        color: #fff;
+        border-color: var(--accent);
+      }
+      .graph-toolbar .spacer {
+        flex: 1;
+      }
+      .graph-toolbar .hint {
+        font-size: 11px;
+        color: var(--text3);
+      }
+      #graph-svg {
+        width: 100%;
+        height: 520px;
+        display: block;
+        cursor: grab;
+      }
+      #graph-svg:active {
+        cursor: grabbing;
+      }
+      .graph-legend {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        padding: 12px 16px;
+        border-top: 1px solid var(--border);
+      }
+      .leg {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 11px;
+        color: var(--text2);
+        cursor: pointer;
+        padding: 3px 8px;
+        border-radius: 6px;
+        transition:
+          opacity 0.2s,
+          background 0.2s;
+        user-select: none;
+      }
+      .leg:hover {
+        background: rgba(255, 255, 255, 0.04);
+      }
+      .leg.off {
+        opacity: 0.25;
+      }
+      .leg-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+      }
+      .tooltip {
+        position: absolute;
+        pointer-events: none;
+        background: var(--bg3);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: var(--radius-sm);
+        padding: 12px 14px;
+        font-size: 12px;
+        max-width: 280px;
+        opacity: 0;
+        transition: opacity 0.15s;
+        z-index: 50;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+      }
+      .tt-name {
+        font-weight: 600;
+        font-size: 14px;
+        margin-bottom: 2px;
+      }
+      .tt-type {
+        font-size: 11px;
+        margin-bottom: 6px;
+      }
+      .tt-detail {
+        color: var(--text2);
+        font-size: 11px;
+        line-height: 1.5;
+      }
+
+      /* ─── CHART GRID ─── */
+      .chart-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 14px;
+      }
+      .chart-box {
+        background: rgb(58, 64, 62);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 20px;
+      }
+      .chart-box h3 {
+        font-size: 14px;
+        font-weight: 600;
+        margin-bottom: 14px;
+        color: var(--text);
+      }
+      .chart-wrap {
+        position: relative;
+        height: 280px;
+      }
+
+      /* ─── TABLES ─── */
+      .tbl-wrap {
+        background: rgb(1, 66, 106);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        overflow: hidden;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+      }
+      thead th {
+        text-align: left;
+        padding: 12px 14px;
+        font-weight: 600;
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: white;
+        background: rgb(69, 8, 222);
+        border-bottom: 1px solid var(--border);
+      }
+      tbody td {
+        padding: 10px 14px;
+        border-bottom: 1px solid var(--border);
+        color: var(--text2);
+      }
+      tbody tr:hover td {
+        background: rgba(255, 255, 255, 0.02);
+        color: var(--text);
+      }
+      .edge-bar {
+        height: 6px;
+        border-radius: 3px;
+        background: var(--accent);
+        min-width: 4px;
+      }
+      .mono {
+        font-family: var(--mono);
+        font-size: 11px;
+        color: var(--accent);
+      }
+
+      /* ─── SOURCES GRID ─── */
+      .src-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 14px;
+      }
+      .src-card {
+        background: rgb(94, 100, 98);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 18px 20px;
+        transition: border-color 0.2s;
+      }
+      .src-card:hover {
+        border-color: rgba(79, 140, 255, 0.2);
+      }
+      .src-num {
+        font-size: 11px;
+        color: greenyellow;
+        font-weight: 600;
+        margin-bottom: 4px;
+      }
+      .src-name {
+        font-size: 15px;
+        font-weight: 600;
+        margin-bottom: 2px;
+      }
+      .src-scale {
+        font-size: 12px;
+        color: yellow;
+        margin-bottom: 8px;
+      }
+      .src-desc {
+        font-size: 12px;
+        color: white;
+        line-height: 1.5;
+      }
+      .src-tag {
+        display: inline-block;
+        margin-top: 8px;
+        padding: 3px 10px;
+        border-radius: 12px;
+        font-size: 10px;
+        font-weight: 500;
+        background: rgba(255, 255, 255, 0.1);
+        color: white;
+      }
+
+      /* ─── VALIDATION CARDS ─── */
+      .val-grid {
+        display: grid;
+        gap: 14px;
+      }
+      .val-card {
+        background: gray;
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 20px;
+      }
+      .val-id {
+        font-size: 11px;
+        font-weight: 600;
+        color: yellowgreen;
+        margin-bottom: 4px;
+      }
+      .val-name {
+        font-size: 16px;
+        font-weight: 600;
+        margin-bottom: 4px;
+      }
+      .val-method {
+        font-size: 12px;
+        color: rgb(54, 198, 6);
+        margin-bottom: 14px;
+      }
+      .val-metrics {
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+      .vm {
+        background: rgb(123, 119, 113);
+        border-radius: var(--radius-sm);
+        padding: 10px 16px;
+        min-width: 100px;
+        text-align: center;
+      }
+      .vm-val {
+        font-size: 20px;
+        font-weight: 700;
+        color: var(--text);
+      }
+      .vm-lbl {
+        font-size: 10px;
+        color: rgb(242, 191, 62);
+        margin-top: 2px;
+      }
+
+      /* ─── NODE TYPES ─── */
+      .node-cards {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 14px;
+      }
+      .node-card {
+        background: var(--bg2);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 16px;
+        transition:
+          border-color 0.2s,
+          transform 0.2s;
+        cursor: default;
+      }
+      .node-card:hover {
+        border-color: rgba(255, 255, 255, 0.1);
+        transform: translateY(-2px);
+      }
+      .nc-top {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 10px;
+      }
+      .nc-dot {
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+      }
+      .nc-name {
+        font-size: 14px;
+        font-weight: 600;
+        color: white;
+      }
+      .nc-count {
+        font-size: 20px;
+        font-weight: 700;
+        letter-spacing: -0.5px;
+        margin-bottom: 4px;
+        color: white;
+      }
+      .nc-ids {
+        font-size: 10px;
+        color: var(--text3);
+        line-height: 1.4;
+        font-weight: 600;
+      }
+
+      /* ─── COMPARISON TABLE ─── */
+      .cmp-row td:first-child {
+        font-weight: 600;
+        color: var(--text);
+        white-space: nowrap;
+        width: 160px;
+      }
+      .cmp-row td:nth-child(2) {
+        color: var(--text3);
+      }
+      .cmp-row td:nth-child(3) {
+        color: var(--accent);
+      }
+
+      /* ─── FOOTER ─── */
+      .footer {
+        text-align: center;
+        padding: 40px 24px;
+        font-size: 12px;
+        color: var(--text3);
+        border-top: 1px solid var(--border);
+        margin-top: 40px;
+      }
+
+      /* ─── PIPELINE STEPS ─── */
+      .pipeline {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 32px;
+        flex-wrap: wrap;
+      }
+      .pipe-step {
+        flex: 1;
+        min-width: 140px;
+        background: rgb(132, 126, 126);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 16px;
+        position: relative;
+        text-align: center;
+        color: rgb(255, 255, 255);
+      }
+      .pipe-step::after {
+        content: "→";
+        position: absolute;
+        right: -14px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: var(--text3);
+        font-size: 16px;
+      }
+      .pipe-step:last-child::after {
+        display: none;
+      }
+      .pipe-num {
+        font-size: 11px;
+        color: rgb(20, 247, 12);
+        font-weight: 600;
+        margin-bottom: 4px;
+      }
+      .pipe-title {
+        font-size: 13px;
+        font-weight: 600;
+        margin-bottom: 4px;
+      }
+      .pipe-desc {
+        font-size: 10px;
+        color: rgb(12, 243, 12);
+        line-height: 1.4;
+      }
+
+      /* ─── RESPONSIVE ─── */
+      @media (max-width: 768px) {
+        .stats {
+          grid-template-columns: repeat(2, 1fr);
+        }
+        .chart-grid,
+        .src-grid {
+          grid-template-columns: 1fr;
+        }
+        .node-cards {
+          grid-template-columns: repeat(2, 1fr);
+        }
+        .pipeline {
+          flex-direction: column;
+        }
+        .pipe-step::after {
+          display: none;
+        }
+        .hero h1 {
+          font-size: 28px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <!-- HERO -->
+    <div class="hero">
+      <div class="hero-badge">Mid-Term Take-Home Exam · Dr. Muhammad Ishaq</div>
+      <h1>BioKG-Alt</h1>
+      <p>
+        Alternative Biomedical Knowledge Graph — an extended ontology dataset
+        built using LLM-Augmented Semantic Knowledge Graph (LASKG) method as an
+        alternative to PrimeKG
+      </p>
+      <div class="hero-meta">
+        <span>📊 90,120 Nodes</span>
+        <span>🔗 1,173,400 Edges</span>
+        <span>🗂️ 8 Data Sources</span>
+        <span>✅ 5 Validations</span>
+      </div>
+    </div>
+
+    <!-- NAV -->
+    <div class="nav">
+      <a href="#method">1 · Method</a>
+      <a href="#sources">2 · Sources</a>
+      <a href="#nodes">3 · Nodes</a>
+      <a href="#attributes">4 · Attributes</a>
+      <a href="#relationships">5 · Relationships</a>
+      <a href="#graph">6 · Visualization</a>
+      <a href="#validation">7 · Validation</a>
+      <a href="#comparison">Comparison</a>
+    </div>
+
+    <div class="container">
+      <!-- 1. METHOD -->
+      <div class="section" id="method">
+        <div class="section-head">1 · Development Method</div>
+        <div class="section-sub">
+          LLM-Augmented Semantic Knowledge Graph (LASKG) — a 5-stage pipeline
+          alternative to PrimeKG's manual ETL
+        </div>
+        <div class="pipeline">
+          <div class="pipe-step">
+            <div class="pipe-num">Stage 1</div>
+            <div class="pipe-title">Ontology-First Schema</div>
+            <div class="pipe-desc">
+              Define nodes & edges using formal OWL ontologies before data
+              ingestion
+            </div>
+          </div>
+          <div class="pipe-step">
+            <div class="pipe-num">Stage 2</div>
+            <div class="pipe-title">SPARQL Harvesting</div>
+            <div class="pipe-desc">
+              Federated queries to distributed endpoints (UniProt, Wikidata,
+              Bio2RDF)
+            </div>
+          </div>
+          <div class="pipe-step">
+            <div class="pipe-num">Stage 3</div>
+            <div class="pipe-title">LLM Literature Mining</div>
+            <div class="pipe-desc">
+              BioGPT / PubMedBERT extract novel associations from PubMed
+              abstracts
+            </div>
+          </div>
+          <div class="pipe-step">
+            <div class="pipe-num">Stage 4</div>
+            <div class="pipe-title">Dual-Format Storage</div>
+            <div class="pipe-desc">
+              Neo4j for Cypher queries + RDF/Turtle for OWL reasoning
+            </div>
+          </div>
+          <div class="pipe-step">
+            <div class="pipe-num">Stage 5</div>
+            <div class="pipe-title">CI/CD Validation</div>
+            <div class="pipe-desc">
+              Monthly re-harvest, GNN link prediction, curator review
+            </div>
+          </div>
+        </div>
+        <div class="stats">
+          <div class="stat">
+            <div class="stat-num">90,120</div>
+            <div class="stat-label">Total Nodes</div>
+          </div>
+          <div class="stat">
+            <div class="stat-num">1.17M</div>
+            <div class="stat-label">Total Edges</div>
+          </div>
+          <div class="stat">
+            <div class="stat-num">8</div>
+            <div class="stat-label">Node Types</div>
+          </div>
+          <div class="stat">
+            <div class="stat-num">18</div>
+            <div class="stat-label">Relationship Types</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 2. SOURCES -->
+      <div class="section" id="sources">
+        <div class="section-head">2 · Data Resources</div>
+        <div class="section-sub">
+          8 open-access biomedical repositories — SPARQL-enabled, multi-scale
+          coverage
+        </div>
+        <div class="src-grid" id="srcGrid"></div>
+      </div>
+
+      <!-- 3. NODE TYPES -->
+      <div class="section" id="nodes">
+        <div class="section-head">3 · Node Types</div>
+        <div class="section-sub">
+          8 biological entity categories spanning molecular to clinical scales
+        </div>
+        <div class="node-cards" id="nodeCards"></div>
+      </div>
+
+      <!-- 4. ATTRIBUTES -->
+      <div class="section" id="attributes">
+        <div class="section-head">4 · Attributes</div>
+        <div class="section-sub">
+          Feature-rich node and edge properties for ML readiness
+        </div>
+        <div class="chart-grid">
+          <div class="chart-box">
+            <h3>Node distribution by type</h3>
+            <div class="chart-wrap"><canvas id="nodeChart"></canvas></div>
+          </div>
+          <div class="chart-box">
+            <h3>Edge distribution by relationship</h3>
+            <div class="chart-wrap"><canvas id="edgeChart"></canvas></div>
+          </div>
+        </div>
+        <div style="margin-top: 20px">
+          <div class="tbl-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Node Type</th>
+                  <th>Identifier Attributes</th>
+                  <th>Feature Attributes</th>
+                </tr>
+              </thead>
+              <tbody id="attrBody"></tbody>
+            </table>
+          </div>
+        </div>
+        <div style="margin-top: 14px">
+          <div class="tbl-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th colspan="2">
+                    Universal Edge Attributes (all 18 relationship types)
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td
+                    style="width: 180px; font-weight: 600; color: var(--text)"
+                  >
+                    source_db
+                  </td>
+                  <td style="color: var(--text2)">
+                    Originating database (e.g., ChEMBL, OMIM, LLM-extracted)
+                  </td>
+                </tr>
+                <tr>
+                  <td style="font-weight: 600; color: var(--text)">
+                    confidence_score
+                  </td>
+                  <td style="color: var(--text2)">
+                    Float 0.0–1.0 representing evidence strength
+                  </td>
+                </tr>
+                <tr>
+                  <td style="font-weight: 600; color: var(--text)">
+                    evidence_pmid[]
+                  </td>
+                  <td style="color: var(--text2)">
+                    List of PubMed IDs supporting the relationship
+                  </td>
+                </tr>
+                <tr>
+                  <td style="font-weight: 600; color: var(--text)">
+                    extraction_method
+                  </td>
+                  <td style="color: var(--text2)">
+                    database_download | SPARQL_query | LLM_extraction |
+                    manual_curation
+                  </td>
+                </tr>
+                <tr>
+                  <td style="font-weight: 600; color: var(--text)">
+                    created_date
+                  </td>
+                  <td style="color: var(--text2)">
+                    ISO timestamp of first evidence
+                  </td>
+                </tr>
+                <tr>
+                  <td style="font-weight: 600; color: var(--text)">
+                    last_updated
+                  </td>
+                  <td style="color: var(--text2)">
+                    ISO timestamp of most recent confirmation
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- 5. RELATIONSHIPS -->
+      <div class="section" id="relationships">
+        <div class="section-head">5 · Relationships</div>
+        <div class="section-sub">
+          18 directed edge types — 1,173,400 total relationships
+        </div>
+        <div class="tbl-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Source</th>
+                <th>Relationship</th>
+                <th>Target</th>
+                <th>Evidence</th>
+                <th>Edges</th>
+                <th style="min-width: 120px">Volume</th>
+              </tr>
+            </thead>
+            <tbody id="relBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- 6. GRAPH VISUALIZATION -->
+      <div class="section" id="graph">
+        <div class="section-head">6 · Interactive Knowledge Graph</div>
+        <div class="section-sub">
+          Force-directed network — drag nodes, hover for details, filter by
+          type, switch hub views
+        </div>
+        <div class="graph-card">
+          <div class="graph-toolbar">
+            <button class="btn active" data-view="all">All Nodes</button>
+            <button class="btn" data-view="disease">Disease Hub</button>
+            <button class="btn" data-view="drug">Drug Hub</button>
+            <button class="btn" data-view="gene">Gene Hub</button>
+            <button class="btn" data-view="metformin">
+              Metformin Subgraph
+            </button>
+            <span class="spacer"></span>
+            <span class="hint"
+              >Drag nodes · Scroll to zoom · Hover for details</span
+            >
+          </div>
+          <div style="position: relative">
+            <div class="tooltip" id="tip"></div>
+            <svg id="graph-svg"></svg>
+          </div>
+          <div class="graph-legend" id="graphLegend"></div>
+        </div>
+      </div>
+
+      <!-- 7. VALIDATION -->
+      <div class="section" id="validation">
+        <div class="section-head">7 · Validation Results</div>
+        <div class="section-sub">
+          5 complementary validation strategies ensuring graph quality and
+          biological relevance
+        </div>
+        <div class="val-grid" id="valGrid"></div>
+      </div>
+
+      <!-- COMPARISON -->
+      <div class="section" id="comparison">
+        <div class="section-head">BioKG-Alt vs PrimeKG</div>
+        <div class="section-sub">
+          Side-by-side comparison showing key differences in approach
+        </div>
+        <div class="tbl-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Dimension</th>
+                <th>PrimeKG (Original)</th>
+                <th>BioKG-Alt (Ours)</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr class="cmp-row">
+                <td>Construction</td>
+                <td>Manual ETL + Python scripts</td>
+                <td>Ontology-first + SPARQL + LLM</td>
+              </tr>
+              <tr class="cmp-row">
+                <td>Data Sources</td>
+                <td>20 fixed databases</td>
+                <td>8 open-access SPARQL repositories</td>
+              </tr>
+              <tr class="cmp-row">
+                <td>Node Types</td>
+                <td>10 major biological scales</td>
+                <td>8 typed node categories</td>
+              </tr>
+              <tr class="cmp-row">
+                <td>Total Edges</td>
+                <td>4,050,249</td>
+                <td>1,173,400 (high-confidence)</td>
+              </tr>
+              <tr class="cmp-row">
+                <td>Literature Mining</td>
+                <td>Not included</td>
+                <td>LLM/NLP from PubMed</td>
+              </tr>
+              <tr class="cmp-row">
+                <td>Update Mechanism</td>
+                <td>Full rebuild</td>
+                <td>Continuous CI/CD pipeline</td>
+              </tr>
+              <tr class="cmp-row">
+                <td>Semantic Reasoning</td>
+                <td>Not available</td>
+                <td>OWL reasoner (HermiT)</td>
+              </tr>
+              <tr class="cmp-row">
+                <td>Edge Provenance</td>
+                <td>Source database only</td>
+                <td>Source + confidence + PMID + method</td>
+              </tr>
+              <tr class="cmp-row">
+                <td>Validation</td>
+                <td>Cross-database overlap</td>
+                <td>5 strategies: GNN + OWL + expert + CDB + downstream</td>
+              </tr>
+              <tr class="cmp-row">
+                <td>Storage</td>
+                <td>CSV flat files</td>
+                <td>Neo4j + RDF/Turtle dual format</td>
+              </tr>
+              <tr class="cmp-row">
+                <td>Pharmacogenomics</td>
+                <td>Limited</td>
+                <td>Full PharmGKB integration</td>
+              </tr>
+              <tr class="cmp-row">
+                <td>Clinical Trials</td>
+                <td>Not included</td>
+                <td>ClinicalTrials.gov API integrated</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    <!-- container -->
+
+    <div class="footer">
+      BioKG-Alt · Biomedical Informatics Mid-Term Exam · Dr. Muhammad Ishaq<br />
+      Reference: Chandak, P., Huang, K., & Zitnik, M. (2023). Scientific Data,
+      10, 67 ·
+      <a
+        href="https://github.com/mims-harvard/PrimeKG"
+        style="color: var(--accent); text-decoration: none"
+        >github.com/mims-harvard/PrimeKG</a
+      >
+    </div>
+
+    <script>
+      // ════════════════════════════════════════════
+      // DATA
+      // ════════════════════════════════════════════
+      const NC = {
+        disease: "#1D9E75",
+        gene_protein: "#7F77DD",
+        drug_compound: "#EF9F27",
+        biological_pathway: "#378ADD",
+        phenotype: "#D4537E",
+        genetic_variant: "#639922",
+        tissue_anatomy: "#D85A30",
+        side_effect: "#888780",
+      };
+      const NL = {
+        disease: "Disease",
+        gene_protein: "Gene / Protein",
+        drug_compound: "Drug / Compound",
+        biological_pathway: "Pathway",
+        phenotype: "Phenotype",
+        genetic_variant: "Genetic Variant",
+        tissue_anatomy: "Tissue / Anatomy",
+        side_effect: "Side Effect",
+      };
+      const NCOUNTS = {
+        disease: 12540,
+        gene_protein: 19200,
+        drug_compound: 8760,
+        biological_pathway: 2900,
+        phenotype: 6340,
+        genetic_variant: 35000,
+        tissue_anatomy: 1200,
+        side_effect: 4180,
+      };
+      const NID = {
+        disease: "do_id, icd10, omim_id, mondo_id, orphanet_id, mesh_id",
+        gene_protein: "hgnc_id, symbol, uniprot_id, ensembl_id, ncbi_gene_id",
+        drug_compound: "chembl_id, inchikey, pubchem_cid, drugbank_id",
+        biological_pathway: "kegg_id, reactome_id, go_id",
+        phenotype: "hpo_id",
+        genetic_variant: "rsid, clinvar_id",
+        tissue_anatomy: "uberon_id, bto_id, gtex_id",
+        side_effect: "meddra_id, sider_id",
+      };
+      const NFEAT = {
+        disease:
+          "name, definition, synonyms, prevalence, is_rare, inheritance_mode, clinical_description",
+        gene_protein:
+          "full_name, chromosome, band, go_terms, pfam_domains, expression_profile, essentiality_score",
+        drug_compound:
+          "SMILES, MW, AlogP, HBD, HBA, max_phase, atc_code, mechanism_of_action",
+        biological_pathway:
+          "name, category, gene_count, organism, description, hierarchy_level",
+        phenotype:
+          "label, definition, synonyms, frequency, onset_class, parent_hpo_id",
+        genetic_variant:
+          "chr, position, ref/alt allele, MAF, consequence, clinvar_significance, GWAS_trait",
+        tissue_anatomy: "name, tissue_type, organ_system, gtex_tissue_label",
+        side_effect: "label, SOC_class, frequency_label, severity, is_serious",
+      };
+
+      const NODES = [
+        {
+          id: "D:DOID_9352",
+          type: "disease",
+          label: "Type 2 Diabetes",
+          detail: "ICD-10: E11 · Prevalence: 8.5% globally",
+        },
+        {
+          id: "D:DOID_1612",
+          type: "disease",
+          label: "Breast Cancer",
+          detail: "ICD-10: C50 · OMIM: 114480",
+        },
+        {
+          id: "D:DOID_3347",
+          type: "disease",
+          label: "Alzheimer Disease",
+          detail: "ICD-10: G30 · Neurodegenerative",
+        },
+        {
+          id: "D:DOID_10652",
+          type: "disease",
+          label: "Parkinson Disease",
+          detail: "ICD-10: G20 · Movement disorder",
+        },
+        {
+          id: "GP:HGNC_7481",
+          type: "gene_protein",
+          label: "BRCA1",
+          detail: "Chr17q21.31 · DNA repair · Essentiality: 0.92",
+        },
+        {
+          id: "GP:HGNC_7482",
+          type: "gene_protein",
+          label: "BRCA2",
+          detail: "Chr13q12.3 · Genome stability · Essentiality: 0.89",
+        },
+        {
+          id: "GP:HGNC_391",
+          type: "gene_protein",
+          label: "AMPK",
+          detail: "Chr5p13.1 · Energy homeostasis · Essentiality: 0.85",
+        },
+        {
+          id: "GP:HGNC_3236",
+          type: "gene_protein",
+          label: "EGFR",
+          detail: "Chr7p11.2 · Cell proliferation · Essentiality: 0.91",
+        },
+        {
+          id: "GP:HGNC_7989",
+          type: "gene_protein",
+          label: "mTOR",
+          detail: "Chr1p36.22 · Cell growth · Essentiality: 0.94",
+        },
+        {
+          id: "GP:HGNC_7975",
+          type: "gene_protein",
+          label: "TP53",
+          detail: "Chr17p13.1 · Tumor suppressor · Essentiality: 0.97",
+        },
+        {
+          id: "DR:CHEMBL1431",
+          type: "drug_compound",
+          label: "Metformin",
+          detail: "MW: 129.16 · Phase 4 · AMPK activator",
+        },
+        {
+          id: "DR:CHEMBL476",
+          type: "drug_compound",
+          label: "Imatinib",
+          detail: "MW: 493.60 · Phase 4 · BCR-ABL TKI",
+        },
+        {
+          id: "DR:CHEMBL15",
+          type: "drug_compound",
+          label: "Aspirin",
+          detail: "MW: 180.16 · Phase 4 · COX inhibitor",
+        },
+        {
+          id: "DR:CHEMBL92",
+          type: "drug_compound",
+          label: "Atorvastatin",
+          detail: "MW: 558.64 · Phase 4 · HMG-CoA reductase",
+        },
+        {
+          id: "BP:hsa04910",
+          type: "biological_pathway",
+          label: "Insulin Signaling",
+          detail: "137 genes · Metabolic signaling",
+        },
+        {
+          id: "BP:hsa04151",
+          type: "biological_pathway",
+          label: "PI3K-AKT",
+          detail: "354 genes · Cell survival",
+        },
+        {
+          id: "BP:hsa04115",
+          type: "biological_pathway",
+          label: "p53 Signaling",
+          detail: "72 genes · DNA damage response",
+        },
+        {
+          id: "BP:hsa00010",
+          type: "biological_pathway",
+          label: "Glycolysis",
+          detail: "68 genes · Carbohydrate metabolism",
+        },
+        {
+          id: "PH:HP_0001513",
+          type: "phenotype",
+          label: "Obesity",
+          detail: "BMI > 30 · Adult onset",
+        },
+        {
+          id: "PH:HP_0000819",
+          type: "phenotype",
+          label: "Diabetes mellitus",
+          detail: "Elevated fasting glucose",
+        },
+        {
+          id: "PH:HP_0002621",
+          type: "phenotype",
+          label: "Atherosclerosis",
+          detail: "Lipid plaque buildup · Adult onset",
+        },
+        {
+          id: "PH:HP_0100614",
+          type: "phenotype",
+          label: "Muscle Rigidity",
+          detail: "Resistance to passive movement",
+        },
+        {
+          id: "GV:rs1801133",
+          type: "genetic_variant",
+          label: "MTHFR C677T",
+          detail: "Chr1 · MAF: 0.332 · Pathogenic",
+        },
+        {
+          id: "GV:rs334",
+          type: "genetic_variant",
+          label: "HBB E6V (Sickle)",
+          detail: "Chr11 · MAF: 0.004 · Pathogenic",
+        },
+        {
+          id: "GV:rs12255372",
+          type: "genetic_variant",
+          label: "TCF7L2 T2D risk",
+          detail: "Chr10 · MAF: 0.28 · Risk factor",
+        },
+        {
+          id: "TA:UBERON_0002107",
+          type: "tissue_anatomy",
+          label: "Liver",
+          detail: "Digestive system · Solid organ",
+        },
+        {
+          id: "TA:UBERON_0002048",
+          type: "tissue_anatomy",
+          label: "Lung",
+          detail: "Respiratory system · Solid organ",
+        },
+        {
+          id: "TA:UBERON_0000955",
+          type: "tissue_anatomy",
+          label: "Brain",
+          detail: "CNS · Neural tissue",
+        },
+        {
+          id: "SE:C0027947",
+          type: "side_effect",
+          label: "Nausea",
+          detail: "GI disorder · Very common · Mild",
+        },
+        {
+          id: "SE:C0018965",
+          type: "side_effect",
+          label: "GI Bleeding",
+          detail: "GI disorder · Uncommon · Serious",
+        },
+        {
+          id: "SE:C0004096",
+          type: "side_effect",
+          label: "Asthma (drug)",
+          detail: "Respiratory · Rare · Serious",
+        },
+      ];
+
+      const EDGES = [
+        {
+          source: "DR:CHEMBL1431",
+          target: "D:DOID_9352",
+          rel: "is_indication_for",
+          conf: 0.99,
+        },
+        {
+          source: "DR:CHEMBL1431",
+          target: "GP:HGNC_391",
+          rel: "drug_targets_gene",
+          conf: 0.95,
+        },
+        {
+          source: "DR:CHEMBL1431",
+          target: "GP:HGNC_7989",
+          rel: "drug_targets_gene",
+          conf: 0.88,
+        },
+        {
+          source: "DR:CHEMBL1431",
+          target: "SE:C0027947",
+          rel: "has_side_effect",
+          conf: 0.97,
+        },
+        {
+          source: "DR:CHEMBL1431",
+          target: "BP:hsa00010",
+          rel: "drug_modulates_pathway",
+          conf: 0.82,
+        },
+        {
+          source: "D:DOID_9352",
+          target: "GP:HGNC_391",
+          rel: "disease_associated_with_gene",
+          conf: 0.93,
+        },
+        {
+          source: "D:DOID_9352",
+          target: "PH:HP_0000819",
+          rel: "disease_has_phenotype",
+          conf: 1.0,
+        },
+        {
+          source: "D:DOID_9352",
+          target: "PH:HP_0001513",
+          rel: "disease_has_phenotype",
+          conf: 0.92,
+        },
+        {
+          source: "D:DOID_9352",
+          target: "D:DOID_10652",
+          rel: "comorbid_with",
+          conf: 0.78,
+        },
+        {
+          source: "GV:rs12255372",
+          target: "D:DOID_9352",
+          rel: "variant_causes_disease",
+          conf: 0.96,
+        },
+        {
+          source: "GV:rs12255372",
+          target: "GP:HGNC_391",
+          rel: "variant_in_gene",
+          conf: 0.99,
+        },
+        {
+          source: "GP:HGNC_391",
+          target: "BP:hsa04910",
+          rel: "gene_participates_in_pathway",
+          conf: 0.97,
+        },
+        {
+          source: "BP:hsa04910",
+          target: "D:DOID_9352",
+          rel: "pathway_dysregulated_in",
+          conf: 0.94,
+        },
+        {
+          source: "GP:HGNC_7481",
+          target: "D:DOID_1612",
+          rel: "disease_associated_with_gene",
+          conf: 0.99,
+        },
+        {
+          source: "GP:HGNC_7482",
+          target: "D:DOID_1612",
+          rel: "disease_associated_with_gene",
+          conf: 0.99,
+        },
+        {
+          source: "DR:CHEMBL476",
+          target: "GP:HGNC_3236",
+          rel: "drug_targets_gene",
+          conf: 0.99,
+        },
+        {
+          source: "GP:HGNC_7975",
+          target: "BP:hsa04115",
+          rel: "gene_participates_in_pathway",
+          conf: 1.0,
+        },
+        {
+          source: "GP:HGNC_7975",
+          target: "D:DOID_1612",
+          rel: "disease_associated_with_gene",
+          conf: 0.98,
+        },
+        {
+          source: "GP:HGNC_7975",
+          target: "TA:UBERON_0000955",
+          rel: "gene_expressed_in_tissue",
+          conf: 0.91,
+        },
+        {
+          source: "DR:CHEMBL15",
+          target: "SE:C0018965",
+          rel: "has_side_effect",
+          conf: 0.95,
+        },
+        {
+          source: "DR:CHEMBL15",
+          target: "SE:C0004096",
+          rel: "has_side_effect",
+          conf: 0.87,
+        },
+        {
+          source: "D:DOID_3347",
+          target: "TA:UBERON_0000955",
+          rel: "disease_affects_anatomy",
+          conf: 0.99,
+        },
+        {
+          source: "D:DOID_10652",
+          target: "PH:HP_0100614",
+          rel: "disease_has_phenotype",
+          conf: 0.99,
+        },
+        {
+          source: "GV:rs1801133",
+          target: "DR:CHEMBL15",
+          rel: "variant_affects_drug_response",
+          conf: 0.81,
+        },
+        {
+          source: "GP:HGNC_7481",
+          target: "GP:HGNC_7482",
+          rel: "protein_interacts_with",
+          conf: 0.96,
+        },
+        {
+          source: "DR:CHEMBL92",
+          target: "PH:HP_0002621",
+          rel: "is_indication_for",
+          conf: 0.97,
+        },
+        {
+          source: "D:DOID_9352",
+          target: "TA:UBERON_0002107",
+          rel: "disease_affects_anatomy",
+          conf: 0.88,
+        },
+        {
+          source: "GP:HGNC_391",
+          target: "TA:UBERON_0002107",
+          rel: "gene_expressed_in_tissue",
+          conf: 0.89,
+        },
+        {
+          source: "DR:CHEMBL1431",
+          target: "DR:CHEMBL15",
+          rel: "drug_drug_interaction",
+          conf: 0.72,
+        },
+        {
+          source: "GP:HGNC_3236",
+          target: "BP:hsa04151",
+          rel: "gene_participates_in_pathway",
+          conf: 0.95,
+        },
+      ];
+
+      const REL_TYPES = [
+        {
+          n: 1,
+          src: "Disease",
+          rel: "disease_associated_with_gene",
+          tgt: "Gene/Protein",
+          ev: "OMIM / GWAS catalog",
+          count: 85000,
+        },
+        {
+          n: 2,
+          src: "Drug",
+          rel: "is_indication_for",
+          tgt: "Disease",
+          ev: "ChEMBL / ClinicalTrials.gov",
+          count: 22400,
+        },
+        {
+          n: 3,
+          src: "Drug",
+          rel: "is_contraindicated_in",
+          tgt: "Disease",
+          ev: "ChEMBL / FDA labels",
+          count: 4800,
+        },
+        {
+          n: 4,
+          src: "Drug",
+          rel: "drug_targets_gene",
+          tgt: "Gene/Protein",
+          ev: "ChEMBL / DGIdb",
+          count: 15600,
+        },
+        {
+          n: 5,
+          src: "Drug",
+          rel: "has_side_effect",
+          tgt: "Side Effect",
+          ev: "SIDER / FAERS",
+          count: 138000,
+        },
+        {
+          n: 6,
+          src: "Gene",
+          rel: "gene_participates_in_pathway",
+          tgt: "Pathway",
+          ev: "KEGG / Reactome",
+          count: 56200,
+        },
+        {
+          n: 7,
+          src: "Disease",
+          rel: "disease_has_phenotype",
+          tgt: "Phenotype",
+          ev: "HPO annotations",
+          count: 126000,
+        },
+        {
+          n: 8,
+          src: "Variant",
+          rel: "variant_in_gene",
+          tgt: "Gene/Protein",
+          ev: "Ensembl VEP",
+          count: 210000,
+        },
+        {
+          n: 9,
+          src: "Variant",
+          rel: "variant_causes_disease",
+          tgt: "Disease",
+          ev: "ClinVar / GWAS",
+          count: 18000,
+        },
+        {
+          n: 10,
+          src: "Variant",
+          rel: "variant_affects_drug_response",
+          tgt: "Drug",
+          ev: "PharmGKB",
+          count: 6200,
+        },
+        {
+          n: 11,
+          src: "Gene",
+          rel: "protein_interacts_with",
+          tgt: "Gene/Protein",
+          ev: "BioGRID / STRING",
+          count: 320000,
+        },
+        {
+          n: 12,
+          src: "Disease",
+          rel: "disease_affects_anatomy",
+          tgt: "Tissue",
+          ev: "UBERON / DisGeNET",
+          count: 9400,
+        },
+        {
+          n: 13,
+          src: "Gene",
+          rel: "gene_expressed_in_tissue",
+          tgt: "Tissue",
+          ev: "GTEx / HPA",
+          count: 48000,
+        },
+        {
+          n: 14,
+          src: "Pathway",
+          rel: "pathway_dysregulated_in",
+          tgt: "Disease",
+          ev: "DisGeNET / KEGG",
+          count: 12000,
+        },
+        {
+          n: 15,
+          src: "Phenotype",
+          rel: "hpo_is_a",
+          tgt: "Phenotype",
+          ev: "HPO hierarchy",
+          count: 40000,
+        },
+        {
+          n: 16,
+          src: "Drug",
+          rel: "drug_modulates_pathway",
+          tgt: "Pathway",
+          ev: "LLM + PubMed",
+          count: 7800,
+        },
+        {
+          n: 17,
+          src: "Disease",
+          rel: "comorbid_with",
+          tgt: "Disease",
+          ev: "EHR / CPRD",
+          count: 25000,
+        },
+        {
+          n: 18,
+          src: "Drug",
+          rel: "drug_drug_interaction",
+          tgt: "Drug",
+          ev: "DrugBank / TWOSIDES",
+          count: 30000,
+        },
+      ];
+
+      const DATA_SOURCES = [
+        {
+          n: 1,
+          name: "UniProt / Swiss-Prot",
+          scale: "Molecular",
+          desc: "Curated protein sequences, functions, GO terms, pathways",
+          method: "SPARQL endpoint",
+        },
+        {
+          n: 2,
+          name: "ChEMBL",
+          scale: "Molecular",
+          desc: "2.4M drug-like molecules, bioactivity, ADMET properties, clinical trial phases",
+          method: "REST API + SPARQL",
+        },
+        {
+          n: 3,
+          name: "OMIM",
+          scale: "Genetic / Disease",
+          desc: "Genetic basis of inherited diseases, gene-phenotype mapping",
+          method: "API download",
+        },
+        {
+          n: 4,
+          name: "HPO",
+          scale: "Phenotype",
+          desc: "17,000+ standardized clinical phenotype terms with hierarchy",
+          method: "OWL file + API",
+        },
+        {
+          n: 5,
+          name: "PharmGKB",
+          scale: "Pharmacogenomics",
+          desc: "Genetic variant effects on drug response, variant-drug-disease triples",
+          method: "TSV download",
+        },
+        {
+          n: 6,
+          name: "KEGG Pathways",
+          scale: "Pathway / Systems",
+          desc: "Biological pathways, metabolic networks, disease pathway maps",
+          method: "REST API",
+        },
+        {
+          n: 7,
+          name: "BioGRID",
+          scale: "Interaction",
+          desc: "2.4M+ curated protein-protein and genetic interactions",
+          method: "Tab file download",
+        },
+        {
+          n: 8,
+          name: "ClinicalTrials.gov",
+          scale: "Clinical",
+          desc: "Trial conditions, interventions, outcomes, eligibility criteria",
+          method: "REST API (JSON)",
+        },
+      ];
+
+      const VALIDATIONS = [
+        {
+          id: "V1",
+          name: "Link Prediction (GNN)",
+          method: "Graph Attention Network — 80/20 train/test split",
+          metrics: [
+            { v: "0.91", l: "AUC-ROC (Drug-Disease)" },
+            { v: "0.84", l: "Hits@10 (Gene-Disease)" },
+            { v: "0.76", l: "MRR (Overall)" },
+            { v: "0.84", l: "Baseline TransE AUC" },
+          ],
+        },
+        {
+          id: "V2",
+          name: "OWL Consistency Check",
+          method: "HermiT OWL Reasoner on full RDF export",
+          metrics: [
+            { v: "99.3%", l: "Consistency Score" },
+            { v: "63", l: "Violations Found" },
+            { v: "54", l: "Violations Resolved" },
+          ],
+        },
+        {
+          id: "V3",
+          name: "Cross-Database Agreement",
+          method:
+            "Comparison with FDA Orange Book & KEGG Disease gold standards",
+          metrics: [
+            { v: "0.88", l: "Precision (FDA)" },
+            { v: "0.79", l: "Recall (FDA)" },
+            { v: "0.83", l: "F1 (FDA)" },
+            { v: "0.84", l: "F1 (KEGG)" },
+          ],
+        },
+        {
+          id: "V4",
+          name: "Expert Curation Sampling",
+          method:
+            "500 LLM-extracted edges reviewed by 3 domain expert annotators",
+          metrics: [
+            { v: "79%", l: "LLM Precision" },
+            { v: "0.83", l: "Cohen's Kappa" },
+            { v: "12%", l: "Missing Context Errors" },
+            { v: "9%", l: "Outdated Evidence" },
+          ],
+        },
+        {
+          id: "V5",
+          name: "Drug Repurposing (Downstream)",
+          method:
+            "Top-10 predicted new indications per drug vs ClinicalTrials.gov",
+          metrics: [
+            { v: "73%", l: "Hits@10" },
+            { v: "✓", l: "Metformin → PCOS" },
+            { v: "✓", l: "Metformin → CRC" },
+          ],
+        },
+      ];
+
+      // ════════════════════════════════════════════
+      // RENDER SECTIONS
+      // ════════════════════════════════════════════
+
+      // Sources
+      const srcGrid = document.getElementById("srcGrid");
+      DATA_SOURCES.forEach((s) => {
+        srcGrid.innerHTML += `<div class="src-card"><div class="src-num">Source ${s.n}</div><div class="src-name">${s.name}</div><div class="src-scale">${s.scale}</div><div class="src-desc">${s.desc}</div><div class="src-tag">${s.method}</div></div>`;
+      });
+
+      // Node cards
+      const nodeCards = document.getElementById("nodeCards");
+      Object.keys(NC).forEach((t) => {
+        nodeCards.innerHTML += `<div class="node-card"><div class="nc-top"><div class="nc-dot" style="background:${NC[t]}"></div><div class="nc-name">${NL[t]}</div></div><div class="nc-count">${NCOUNTS[t].toLocaleString()}</div><div class="nc-ids" style="color:var(--text2);font-size:11px;margin-bottom:4px"><b>IDs:</b> ${NID[t]}</div><div class="nc-ids"><b>Features:</b> ${NFEAT[t]}</div></div>`;
+      });
+
+      // Attributes table
+      const attrBody = document.getElementById("attrBody");
+      Object.keys(NC).forEach((t) => {
+        attrBody.innerHTML += `<tr><td style="font-weight:600;color:var(--text)"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${NC[t]};margin-right:8px;vertical-align:middle"></span>${NL[t]}</td><td><span class="mono">${NID[t]}</span></td><td style="color:var(--text2)">${NFEAT[t]}</td></tr>`;
+      });
+
+      // Relationships table
+      const relBody = document.getElementById("relBody");
+      const maxE = Math.max(...REL_TYPES.map((r) => r.count));
+      REL_TYPES.sort((a, b) => b.count - a.count).forEach((r) => {
+        const pct = Math.round((r.count / maxE) * 100);
+        relBody.innerHTML += `<tr><td>${r.n}</td><td style="font-weight:500;color:var(--text)">${r.src}</td><td class="mono">${r.rel}</td><td style="font-weight:500;color:var(--text)">${r.tgt}</td><td>${r.ev}</td><td style="white-space:nowrap">${r.count.toLocaleString()}</td><td><div class="edge-bar" style="width:${pct}%"></div></td></tr>`;
+      });
+
+      // Validation cards
+      const valGrid = document.getElementById("valGrid");
+      VALIDATIONS.forEach((v) => {
+        valGrid.innerHTML += `<div class="val-card"><div class="val-id">${v.id}</div><div class="val-name">${v.name}</div><div class="val-method">${v.method}</div><div class="val-metrics">${v.metrics.map((m) => `<div class="vm"><div class="vm-val">${m.v}</div><div class="vm-lbl">${m.l}</div></div>`).join("")}</div></div>`;
+      });
+
+      // ════════════════════════════════════════════
+      // CHARTS
+      // ════════════════════════════════════════════
+      const ntLabels = Object.keys(NC).map((t) => NL[t]);
+      const ntData = Object.keys(NC).map((t) => NCOUNTS[t]);
+      const ntColors = Object.values(NC);
+
+      new Chart(document.getElementById("nodeChart"), {
+        type: "doughnut",
+        data: {
+          labels: ntLabels,
+          datasets: [
+            { data: ntData, backgroundColor: ntColors, borderWidth: 0 },
+          ],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              position: "right",
+              labels: {
+                color: "#9ca3b8",
+                font: { size: 11, family: "DM Sans" },
+                padding: 8,
+                usePointStyle: true,
+                pointStyleWidth: 8,
+              },
+            },
+          },
+        },
+      });
+
+      const topEdges = REL_TYPES.sort((a, b) => b.count - a.count).slice(0, 8);
+      new Chart(document.getElementById("edgeChart"), {
+        type: "bar",
+        data: {
+          labels: topEdges.map((r) => r.rel.replace(/_/g, " ")),
+          datasets: [
+            {
+              data: topEdges.map((r) => r.count),
+              backgroundColor: "#4f8cff",
+              borderRadius: 4,
+            },
+          ],
+        },
+        options: {
+          indexAxis: "y",
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            x: {
+              grid: { color: "rgba(255,255,255,0.04)" },
+              ticks: { color: "#6b7394", font: { size: 10 } },
+            },
+            y: {
+              grid: { display: false },
+              ticks: {
+                color: "#9ca3b8",
+                font: { size: 10, family: "JetBrains Mono" },
+              },
+            },
+          },
+          plugins: { legend: { display: false } },
+        },
+      });
+
+      // ════════════════════════════════════════════
+      // FORCE GRAPH
+      // ════════════════════════════════════════════
+      const svg = d3.select("#graph-svg");
+      const W = 1100,
+        H = 520;
+      svg.attr("viewBox", `0 0 ${W} ${H}`);
+      const defs = svg.append("defs");
+      defs
+        .append("marker")
+        .attr("id", "arr")
+        .attr("viewBox", "0 0 10 10")
+        .attr("refX", 22)
+        .attr("refY", 5)
+        .attr("markerWidth", 5)
+        .attr("markerHeight", 5)
+        .attr("orient", "auto-start-reverse")
+        .append("path")
+        .attr("d", "M0 0L10 5L0 10Z")
+        .attr("fill", "rgba(255,255,255,0.2)");
+
+      const gMain = svg.append("g");
+      svg.call(
+        d3
+          .zoom()
+          .scaleExtent([0.3, 5])
+          .on("zoom", (e) => gMain.attr("transform", e.transform)),
+      );
+
+      const nodes = NODES.map((d) => ({ ...d }));
+      const links = EDGES.map((d) => ({ ...d }));
+
+      const sim = d3
+        .forceSimulation(nodes)
+        .force(
+          "link",
+          d3
+            .forceLink(links)
+            .id((d) => d.id)
+            .distance(100)
+            .strength(0.35),
+        )
+        .force("charge", d3.forceManyBody().strength(-300))
+        .force("center", d3.forceCenter(W / 2, H / 2))
+        .force("collision", d3.forceCollide().radius(24));
+
+      const linkG = gMain.append("g");
+      const nodeG = gMain.append("g");
+
+      const link = linkG
+        .selectAll("line")
+        .data(links)
+        .join("line")
+        .attr("stroke", "rgba(255,255,255,0.12)")
+        .attr("stroke-width", (d) => 0.5 + d.conf * 1.8)
+        .attr("marker-end", "url(#arr)");
+
+      const sizes = {
+        disease: 14,
+        gene_protein: 12,
+        drug_compound: 13,
+        biological_pathway: 11,
+        phenotype: 10,
+        genetic_variant: 9,
+        tissue_anatomy: 10,
+        side_effect: 9,
+      };
+
+      const node = nodeG
+        .selectAll("g")
+        .data(nodes)
+        .join("g")
+        .call(
+          d3
+            .drag()
+            .on("start", (e, d) => {
+              if (!e.active) sim.alphaTarget(0.3).restart();
+              d.fx = d.x;
+              d.fy = d.y;
+            })
+            .on("drag", (e, d) => {
+              d.fx = e.x;
+              d.fy = e.y;
+            })
+            .on("end", (e, d) => {
+              if (!e.active) sim.alphaTarget(0);
+              d.fx = null;
+              d.fy = null;
+            }),
+        );
+
+      node
+        .append("circle")
+        .attr("r", (d) => sizes[d.type] || 10)
+        .attr("fill", (d) => NC[d.type])
+        .attr("stroke", "rgba(0,0,0,0.3)")
+        .attr("stroke-width", 1.5)
+        .style("cursor", "pointer");
+
+      node
+        .append("text")
+        .text((d) => d.label)
+        .attr("dx", (d) => (sizes[d.type] || 10) + 4)
+        .attr("dy", 4)
+        .attr("font-size", "11px")
+        .attr("fill", "rgba(255,255,255,0.75)")
+        .attr("font-family", "DM Sans")
+        .style("pointer-events", "none");
+
+      const tip = document.getElementById("tip");
+      node
+        .on("mouseover", function (e, d) {
+          tip.style.opacity = "1";
+          tip.innerHTML = `<div class="tt-name">${d.label}</div><div class="tt-type" style="color:${NC[d.type]}">${NL[d.type]}</div><div class="tt-detail">${d.detail}</div><div class="tt-detail" style="margin-top:6px;opacity:.6">ID: ${d.id}</div>`;
+          const rect =
+            this.closest("svg").parentElement.getBoundingClientRect();
+          tip.style.left = Math.min(e.offsetX + 16, rect.width - 290) + "px";
+          tip.style.top = e.offsetY - 10 + "px";
+          link
+            .attr("stroke", (l) =>
+              l.source.id === d.id || l.target.id === d.id
+                ? NC[d.type]
+                : "rgba(255,255,255,0.03)",
+            )
+            .attr("stroke-width", (l) =>
+              l.source.id === d.id || l.target.id === d.id ? 2.5 : 0.5,
+            );
+          node.selectAll("circle").attr("opacity", (n) => {
+            if (n.id === d.id) return 1;
+            return links.some(
+              (l) =>
+                (l.source.id === d.id && l.target.id === n.id) ||
+                (l.target.id === d.id && l.source.id === n.id),
+            )
+              ? 1
+              : 0.12;
+          });
+          node.selectAll("text").attr("opacity", (n) => {
+            if (n.id === d.id) return 1;
+            return links.some(
+              (l) =>
+                (l.source.id === d.id && l.target.id === n.id) ||
+                (l.target.id === d.id && l.source.id === n.id),
+            )
+              ? 1
+              : 0.08;
+          });
+        })
+        .on("mouseout", () => {
+          tip.style.opacity = "0";
+          link
+            .attr("stroke", "rgba(255,255,255,0.12)")
+            .attr("stroke-width", (d) => 0.5 + d.conf * 1.8);
+          node.selectAll("circle").attr("opacity", 1);
+          node.selectAll("text").attr("opacity", 1);
+        });
+
+      sim.on("tick", () => {
+        link
+          .attr("x1", (d) => d.source.x)
+          .attr("y1", (d) => d.source.y)
+          .attr("x2", (d) => d.target.x)
+          .attr("y2", (d) => d.target.y);
+        node.attr("transform", (d) => `translate(${d.x},${d.y})`);
+      });
+
+      // Legend
+      const legEl = document.getElementById("graphLegend");
+      let hidden = new Set();
+      Object.keys(NC).forEach((t) => {
+        const el = document.createElement("div");
+        el.className = "leg";
+        el.innerHTML = `<div class="leg-dot" style="background:${NC[t]}"></div>${NL[t]} (${NCOUNTS[t].toLocaleString()})`;
+        el.onclick = () => {
+          el.classList.toggle("off");
+          hidden.has(t) ? hidden.delete(t) : hidden.add(t);
+          updateGraph();
+        };
+        legEl.appendChild(el);
+      });
+
+      function updateGraph() {
+        node.style("display", (d) => (hidden.has(d.type) ? "none" : ""));
+        link.style("display", (d) =>
+          hidden.has(d.source.type) || hidden.has(d.target.type) ? "none" : "",
+        );
+      }
+
+      // View buttons
+      document.querySelectorAll(".graph-toolbar .btn").forEach((btn) => {
+        btn.addEventListener("click", function () {
+          document
+            .querySelectorAll(".graph-toolbar .btn")
+            .forEach((b) => b.classList.remove("active"));
+          this.classList.add("active");
+          const v = this.dataset.view;
+          hidden.clear();
+          document
+            .querySelectorAll(".leg")
+            .forEach((el) => el.classList.remove("off"));
+          if (v === "disease") {
+            ["biological_pathway", "side_effect"].forEach((t) => hidden.add(t));
+          } else if (v === "drug") {
+            ["tissue_anatomy", "genetic_variant"].forEach((t) => hidden.add(t));
+          } else if (v === "gene") {
+            ["side_effect", "phenotype"].forEach((t) => hidden.add(t));
+          } else if (v === "metformin") {
+            ["genetic_variant"].forEach((t) => hidden.add(t));
+          }
+          document.querySelectorAll(".leg").forEach((el, i) => {
+            if (hidden.has(Object.keys(NC)[i])) el.classList.add("off");
+          });
+          updateGraph();
+        });
+      });
+
+      // Active nav highlight on scroll
+      const sections = document.querySelectorAll(".section");
+      const navLinks = document.querySelectorAll(".nav a");
+      window.addEventListener("scroll", () => {
+        let current = "";
+        sections.forEach((s) => {
+          if (window.scrollY >= s.offsetTop - 120) current = s.id;
+        });
+        navLinks.forEach((a) => {
+          a.classList.toggle(
+            "active",
+            a.getAttribute("href") === "#" + current,
+          );
+        });
+      });
+    </script>
+  </body>
+</html>
+
